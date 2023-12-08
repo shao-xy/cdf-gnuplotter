@@ -10,6 +10,7 @@ def parse_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('src', nargs='+', help='Source file(s)')
 	parser.add_argument('-k', '--column', help='Use which column. 1 by default.', type=int, default=1)
+	parser.add_argument('-a', '--alias', help='Use another name for the source file. Only works if only one source file is given.')
 	parser.add_argument('-o', '--output-dir', help='Output directory. "cdf-plot/" by default.')
 	parser.add_argument('-t', '--title', help='Title of the CDF graph')
 	parser.add_argument('-x', '--xlabel', help='Label for X axis')
@@ -73,7 +74,9 @@ set label %d "P99" at %s,0.99 point pointtype 7 pointsize 1.5
 		return '"%s" using (($1)):(1./%d.) with linespoints title \'%s\' lw 2 lt %d smooth cumulative'\
 		% (self.sorted_name, self.total_lines, self.name.replace('_', '\\_'), next_lt), next_lt + 1
 
-def handle_single_file(src, collector, column, output_dir, numpat):
+def handle_single_file(src, collector, output_dir, args):
+	column = args.column
+	numpat = args.numpat
 	src_dn = os.path.dirname(src)
 	src_bn = os.path.basename(src)
 	sorted_src = src_dn + (src_dn and '/sorted_' or 'sorted_') + src_bn
@@ -86,7 +89,7 @@ def handle_single_file(src, collector, column, output_dir, numpat):
 	tag = src_name
 
 	# Sort
-	sorted_src_name = 'sorted_%s' % src.replace('/', '_')
+	sorted_src_name = len(args.src) == 1 and args.alias or 'sorted_%s' % src.replace('/', '_')
 	sorted_src = os.path.join(output_dir, sorted_src_name)
 	call_shell('awk \'{print $%d}\' %s | sort -n -o %s' % (column, src, sorted_src))
 
@@ -139,7 +142,7 @@ def handle_single_file(src, collector, column, output_dir, numpat):
 			% (total_lines, tostring(average, numpat),\
 			tostring(medium_value, numpat), tostring(p99_value, numpat)), tag)
 
-	collector.append(HandledData(src_name, src, sorted_src_name, sorted_src, medium_value,\
+	collector.append(HandledData(args.alias or src_name, src, sorted_src_name, sorted_src, medium_value,\
 								 average, avg_ln, total_lines, p99_value))
 
 def main():
@@ -161,7 +164,7 @@ def main():
 	collector = []
 	thread_pool = []
 	for single_src in args.src:
-		t = threading.Thread(target=handle_single_file, args=(single_src, collector, args.column, output_dir, args.numpat))
+		t = threading.Thread(target=handle_single_file, args=(single_src, collector, output_dir, args))
 		t.start()
 		thread_pool.append(t)
 
